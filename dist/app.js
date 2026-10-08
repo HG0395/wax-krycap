@@ -117,7 +117,8 @@ $("new-ball").onclick=()=>{newBall();notify("새 왁뿌볼이 준비됐어요!")
 document.querySelectorAll(".swatch").forEach(b=>b.onclick=()=>newBall(Number(b.dataset.color)));
 document.addEventListener("keydown",e=>{
  if(e.code!=="Space"||e.altKey||e.ctrlKey||e.metaKey)return;
- if(e.target instanceof HTMLButtonElement||e.target instanceof HTMLAnchorElement)return;
+ if(e.target!==canvas&&e.target!==document.body)return;
+ if(e.target===document.body&&globalThis.window?.scrollY>0)return;
  e.preventDefault();if(game==="clicker")clickPoint();else{const next=tiles.find(t=>!t.broken);if(next)crack(next.c.x,next.c.y,true);else squish=.1}
 });
 let last=performance.now(),autoTimer=0;
@@ -141,6 +142,13 @@ function frame(now){
  requestAnimationFrame(frame);
 }
 newBall();renderClicker();requestAnimationFrame(frame);
+function openGameFromHash(){
+ const hash=globalThis.location?.hash;
+ if(hash==="#clicker"||hash==="#wax"){selectGame(hash.slice(1));$(hash.slice(1)).scrollIntoView?.({block:"start"});}
+}
+window.addEventListener("hashchange",openGameFromHash);
+openGameFromHash();
+
 const modelContext=document.modelContext;
 if(modelContext?.registerTool){
  const lifecycle=new AbortController();
