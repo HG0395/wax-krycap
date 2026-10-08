@@ -26,3 +26,25 @@ for(const match of html.matchAll(/(?:src|href)="([^"]+)"/g)){const p=match[1];if
 assert.equal(tools.size,4);
 console.log("PASS: click rewards, upgrade costs, insufficient points, game switching, all wax fragments, colors, held pressure, local assets, tool state and invalid inputs.");
 
+
+assert.equal(node("vibration").disabled,true);
+const vibrations=[];
+const hapticSandbox={...sandbox,navigator:{vibrate:pattern=>{vibrations.push(pattern);return true}}};
+vm.createContext(hapticSandbox);vm.runInContext(fs.readFileSync("dist/app.js","utf8"),hapticSandbox);
+vibrations.length=0;assert.equal(node("vibration").disabled,false);
+assert.equal(node("vibration").attrs["aria-pressed"],"false");
+node("click-button").onclick();assert.equal(vibrations.length,0);
+node("vibration").onclick();assert.equal(vibrations.at(-1),15);
+node("click-button").onclick();assert.equal(vibrations.at(-1),8);
+tools.get("select_arcade_game").execute({game:"wax"});assert.equal(vibrations.at(-1),0);
+vm.runInContext("crack(0,0)",hapticSandbox);assert.equal(JSON.stringify(vibrations.at(-1)),"[12,8,18]");
+let count=vibrations.length;vm.runInContext("crack(500,500)",hapticSandbox);assert.equal(vibrations.length,count);
+hapticSandbox.document.hidden=true;vm.runInContext("crack(0,0)",hapticSandbox);assert.equal(vibrations.length,count);hapticSandbox.document.hidden=false;
+vm.runInContext("for(let i=0;i<60;i++){const t=tiles.find(t=>!t.broken);if(t)crack(t.c.x,t.c.y,true)}",hapticSandbox);
+assert.equal(JSON.stringify(vibrations.at(-1)),"[25,35,45]");
+node("vibration").onclick();assert.equal(vibrations.at(-1),0);
+count=vibrations.length;node("click-button").onclick();assert.equal(vibrations.length,count);
+hapticSandbox.navigator.vibrate=()=>false;node("vibration").onclick();assert.equal(node("vibration").attrs["aria-pressed"],"false");
+hapticSandbox.navigator.vibrate=()=>{throw new Error("blocked")};node("vibration").onclick();assert.equal(node("vibration").attrs["aria-pressed"],"false");
+node("click-button").onclick();
+console.log("PASS: unsupported API, opt-in, click pulse, wax pulse, completion pulse, outside ball, hidden document, stop on game switch, disable, denied and throwing API.");

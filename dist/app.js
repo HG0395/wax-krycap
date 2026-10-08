@@ -26,8 +26,39 @@ function sound(kind="click"){
  }catch{soundOn=false;$("sound").textContent="♪ 소리 지원 안 됨";$("sound").setAttribute("aria-pressed","false")}
 }
 $("sound").onclick=()=>{soundOn=!soundOn;$("sound").setAttribute("aria-pressed",String(soundOn));$("sound").textContent=soundOn?"♪ 소리 켜짐":"♪ 소리 꺼짐";sound()};
+const vibrationButton=$("vibration");
+let vibrationSupported=typeof globalThis.navigator?.vibrate==="function",vibrationOn=false;
+function renderVibration(){
+ vibrationButton.disabled=!vibrationSupported;
+ vibrationButton.setAttribute("aria-pressed",String(vibrationOn));
+ vibrationButton.textContent=vibrationSupported?(vibrationOn?"진동 켜짐":"진동 꺼짐"):"진동 미지원";
+ vibrationButton.title=vibrationSupported?"클릭과 왁스 파괴 시 진동":"이 브라우저에서는 진동을 지원하지 않아요.";
+}
+function stopVibration(){
+ if(!vibrationSupported)return;
+ try{globalThis.navigator.vibrate(0)}catch{}
+}
+function vibrate(pattern){
+ if(!vibrationOn||!vibrationSupported||document.hidden)return;
+ try{
+ if(globalThis.navigator.vibrate(pattern)===false)throw new Error("Vibration unavailable");
+ }catch{
+ vibrationOn=false;stopVibration();renderVibration();
+ notify("이 환경에서는 진동을 사용할 수 없어요.");
+ }
+}
+vibrationButton.onclick=()=>{
+ vibrationOn=!vibrationOn;
+ if(vibrationOn)vibrate(15);else stopVibration();
+ renderVibration();
+};
+renderVibration();
+window.addEventListener("blur",stopVibration);
+window.addEventListener("pagehide",stopVibration);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopVibration()});
+
 function clickPoint(){
- points+=powerLevel+1;clicks++;renderClicker();sound();
+ points+=powerLevel+1;clicks++;renderClicker();sound();vibrate(8);
  const b=$("click-button");b.classList.remove("pressed");void b.offsetWidth;b.classList.add("pressed");setTimeout(()=>b.classList.remove("pressed"),100);
  const p=document.createElement("span");p.className="float-point";p.textContent="+"+fmt(powerLevel+1);p.style.left=(45+Math.random()*10)+"%";p.style.top="36%";b.parentElement.append(p);setTimeout(()=>p.remove(),750);
  if([100,500,1000].includes(clicks))notify(fmt(clicks)+"번 클릭! 손끝이 제법인데요?");
@@ -43,7 +74,7 @@ function buy(type){
 $("upgrade-power").onclick=()=>buy("power");$("upgrade-auto").onclick=()=>buy("auto");
 function selectGame(value){
  if(!["clicker","wax"].includes(value))throw new Error("게임을 선택해주세요.");
- game=value;holding=false;
+ game=value;holding=false;stopVibration();
  $("clicker").hidden=value!=="clicker";$("wax").hidden=value!=="wax";
  $("tab-clicker").setAttribute("aria-pressed",String(value==="clicker"));$("tab-wax").setAttribute("aria-pressed",String(value==="wax"));return {game};
 }
@@ -54,7 +85,7 @@ let color=0,tiles=[],pieces=[],holding=false,pointer={x:0,y:0},lastBreak=0,broke
 function trianglePath(p){ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);ctx.lineTo(p[1].x,p[1].y);ctx.lineTo(p[2].x,p[2].y);ctx.closePath()}
 function newBall(nextColor=color){
  if(!Number.isInteger(nextColor)||nextColor<0||nextColor>=palettes.length)throw new Error("색상 번호는 0~3입니다.");
- color=nextColor;tiles=[];pieces=[];broken=0;finished=false;holding=false;squish=0;
+ stopVibration();color=nextColor;tiles=[];pieces=[];broken=0;finished=false;holding=false;squish=0;
  const n=28,radii=[0,42,83,122,R];
  const point=(ring,i)=>({x:radii[ring]*Math.cos(i*2*Math.PI/n-Math.PI/2),y:radii[ring]*Math.sin(i*2*Math.PI/n-Math.PI/2)});
  const add=p=>tiles.push({p,c:{x:p.reduce((s,v)=>s+v.x,0)/3,y:p.reduce((s,v)=>s+v.y,0)/3},broken:false,tone:Math.random()*4-2});
@@ -72,7 +103,7 @@ function crack(x,y,keyboard=false){
  const close=available.filter(t=>keyboard||Math.hypot(t.c.x-x,t.c.y-y)<64).slice(0,4);
  if(!close.length)return {brokenPercent:Math.round(broken/tiles.length*100)};
  for(const t of close){t.broken=true;broken++;pieces.push({p:t.p.map(v=>({x:v.x-t.c.x,y:v.y-t.c.y})),x:t.c.x,y:t.c.y,vx:(t.c.x-x)*2+(Math.random()-.5)*150,vy:-100-Math.random()*100,angle:0,spin:(Math.random()-.5)*8,life:2.3,tone:t.tone})}
- sound("crack");squish=.055;
+ sound("crack");vibrate(broken===tiles.length?[25,35,45]:[12,8,18]);squish=.055;
  const percent=Math.round(broken/tiles.length*100);$("wax-percent").textContent=percent+"%";$("wax-progress").value=percent;
  if(broken===tiles.length){finished=true;$("wax-hint").textContent="속까지 말랑! 새 공으로 다시 바삭하게";notify("껍질을 전부 벗겼어요!")}
  else if(percent>65)$("wax-hint").textContent="남은 껍질을 쓱쓱 문질러보세요";
@@ -81,7 +112,7 @@ function crack(x,y,keyboard=false){
 function pointerPosition(e){const rect=canvas.getBoundingClientRect();return {x:(e.clientX-rect.left)*640/rect.width-CX,y:(e.clientY-rect.top)*470/rect.height-CY}}
 canvas.addEventListener("pointerdown",e=>{e.preventDefault();canvas.focus({preventScroll:true});pointer=pointerPosition(e);holding=true;canvas.setPointerCapture(e.pointerId);crack(pointer.x,pointer.y);lastBreak=performance.now()});
 canvas.addEventListener("pointermove",e=>{pointer=pointerPosition(e)});
-canvas.addEventListener("pointerup",()=>holding=false);canvas.addEventListener("pointercancel",()=>holding=false);canvas.addEventListener("lostpointercapture",()=>holding=false);window.addEventListener("blur",()=>holding=false);document.addEventListener("visibilitychange",()=>holding=false);
+canvas.addEventListener("pointerup",()=>{holding=false;stopVibration()});canvas.addEventListener("pointercancel",()=>{holding=false;stopVibration()});canvas.addEventListener("lostpointercapture",()=>{holding=false;stopVibration()});window.addEventListener("blur",()=>{holding=false;stopVibration()});document.addEventListener("visibilitychange",()=>{holding=false;stopVibration()});
 $("new-ball").onclick=()=>{newBall();notify("새 왁뿌볼이 준비됐어요!")};
 document.querySelectorAll(".swatch").forEach(b=>b.onclick=()=>newBall(Number(b.dataset.color)));
 document.addEventListener("keydown",e=>{
@@ -120,5 +151,3 @@ if(modelContext?.registerTool){
  register({name:"create_new_wax_ball",description:"진행 중인 왁뿌볼을 초기화하고 지정 색상의 새 공을 만듭니다.",inputSchema:{type:"object",properties:{color:{type:"integer",minimum:0,maximum:3}},required:["color"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:input=>newBall(input.color)});
  window.addEventListener("pagehide",()=>lifecycle.abort(),{once:true});
 }
-
-
