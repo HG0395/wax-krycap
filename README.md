@@ -39,3 +39,6 @@ Node.js에서 `node verify.cjs`를 실행하세요. 클릭 보상, 강화, 파�
 - 게시자: ca-pub-2685311477810917
 - ads.txt: dist/ads.txt → https://wax-krycap.pages.dev/ads.txt
 - 광고 슬롯이나 자동 광고 설정은 임의로 추가하지 않았습니다. 애드센스 계정에서 사이트 확인과 광고 설정을 완료하세요.
+
+## 비교 체험과 유지관리
+껍질 두께(1~3회 반응), 이번 화면의 완성 기록 5개, 강화 효율 계산기를 제공합니다. economy.js는 DOM과 분리한 실제 계산식입니다. robots.txt·sitemap.xml·404.html을 배포합니다. 심사와 운영상의 한계는 REVIEW-NOTES.md를 참고하세요.

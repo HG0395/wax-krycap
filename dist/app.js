@@ -81,14 +81,15 @@ function selectGame(value){
 $("tab-clicker").onclick=()=>selectGame("clicker");$("tab-wax").onclick=()=>selectGame("wax");
 const canvas=$("wax-canvas"),ctx=canvas.getContext("2d"),CX=320,CY=218,R=155;
 const palettes=[{name:"딸기 우유",h:337,s:65,l:79,core:"#b9a2ee"},{name:"포도 소다",h:260,s:64,l:79,core:"#f6b2cf"},{name:"민트 크림",h:158,s:43,l:73,core:"#f6d68b"},{name:"망고 푸딩",h:36,s:95,l:72,core:"#b9b2ee"}];
+let waxLayers=1,waxReactions=0,waxResults=[];
 let color=0,tiles=[],pieces=[],holding=false,pointer={x:0,y:0},lastBreak=0,broken=0,squish=0,finished=false;
 function trianglePath(p){ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);ctx.lineTo(p[1].x,p[1].y);ctx.lineTo(p[2].x,p[2].y);ctx.closePath()}
 function newBall(nextColor=color){
  if(!Number.isInteger(nextColor)||nextColor<0||nextColor>=palettes.length)throw new Error("색상 번호는 0~3입니다.");
- stopVibration();color=nextColor;tiles=[];pieces=[];broken=0;finished=false;holding=false;squish=0;
+ stopVibration();color=nextColor;tiles=[];pieces=[];broken=0;finished=false;holding=false;squish=0;waxReactions=0;$("wax-reactions").textContent="0";
  const n=28,radii=[0,42,83,122,R];
  const point=(ring,i)=>({x:radii[ring]*Math.cos(i*2*Math.PI/n-Math.PI/2),y:radii[ring]*Math.sin(i*2*Math.PI/n-Math.PI/2)});
- const add=p=>tiles.push({p,c:{x:p.reduce((s,v)=>s+v.x,0)/3,y:p.reduce((s,v)=>s+v.y,0)/3},broken:false,tone:Math.random()*4-2});
+ const add=p=>tiles.push({p,c:{x:p.reduce((s,v)=>s+v.x,0)/3,y:p.reduce((s,v)=>s+v.y,0)/3},broken:false,hits:0,tone:Math.random()*4-2});
  for(let i=0;i<n;i++)add([{x:0,y:0},point(1,i),point(1,i+1)]);
  for(let ring=1;ring<4;ring++)for(let i=0;i<n;i++){add([point(ring,i),point(ring+1,i),point(ring+1,i+1)]);add([point(ring,i),point(ring+1,i+1),point(ring,i+1)])}
  $("wax-percent").textContent="0%";$("wax-progress").value=0;$("wax-hint").textContent="꾹 누르고, 쓱 문질러보세요";$("color-name").textContent=palettes[color].name;
@@ -102,10 +103,11 @@ function crack(x,y,keyboard=false){
  const available=tiles.filter(t=>!t.broken).sort((a,b)=>Math.hypot(a.c.x-x,a.c.y-y)-Math.hypot(b.c.x-x,b.c.y-y));
  const close=available.filter(t=>keyboard||Math.hypot(t.c.x-x,t.c.y-y)<64).slice(0,4);
  if(!close.length)return {brokenPercent:Math.round(broken/tiles.length*100)};
- for(const t of close){t.broken=true;broken++;pieces.push({p:t.p.map(v=>({x:v.x-t.c.x,y:v.y-t.c.y})),x:t.c.x,y:t.c.y,vx:(t.c.x-x)*2+(Math.random()-.5)*150,vy:-100-Math.random()*100,angle:0,spin:(Math.random()-.5)*8,life:2.3,tone:t.tone})}
+ waxReactions++;$("wax-reactions").textContent=String(waxReactions);
+ for(const t of close){t.hits++;if(t.hits<waxLayers)continue;t.broken=true;broken++;pieces.push({p:t.p.map(v=>({x:v.x-t.c.x,y:v.y-t.c.y})),x:t.c.x,y:t.c.y,vx:(t.c.x-x)*2+(Math.random()-.5)*150,vy:-100-Math.random()*100,angle:0,spin:(Math.random()-.5)*8,life:2.3,tone:t.tone})}
  sound("crack");vibrate(broken===tiles.length?[25,35,45]:[12,8,18]);squish=.055;
  const percent=Math.round(broken/tiles.length*100);$("wax-percent").textContent=percent+"%";$("wax-progress").value=percent;
- if(broken===tiles.length){finished=true;$("wax-hint").textContent="속까지 말랑! 새 공으로 다시 바삭하게";notify("껍질을 전부 벗겼어요!")}
+ if(broken===tiles.length){finished=true;waxResults.unshift((["","얇게","보통","두껍게"][waxLayers])+" · "+waxReactions+"회 반응");waxResults=waxResults.slice(0,5);$("wax-comparisons").textContent="완성 기록 (최근순): "+waxResults.join(" / ");$("wax-hint").textContent="속까지 말랑! 새 공으로 다시 바삭하게";notify("껍질을 전부 벗겼어요!")}
  else if(percent>65)$("wax-hint").textContent="남은 껍질을 쓱쓱 문질러보세요";
  return {brokenPercent:percent};
 }
@@ -133,7 +135,7 @@ function frame(now){
  ctx.save();ctx.translate(CX,CY);ctx.scale(1+squish,1-squish);
  const p=palettes[color],core=ctx.createRadialGradient(-53,-68,12,15,25,R*1.2);core.addColorStop(0,"#fff2fc");core.addColorStop(.25,p.core);core.addColorStop(1,"#7868a4");
  ctx.beginPath();ctx.arc(0,0,R,0,Math.PI*2);ctx.fillStyle=core;ctx.fill();
- for(const t of tiles){if(t.broken)continue;trianglePath(t.p);const light=p.l+(-t.c.x*.025-t.c.y*.065)+t.tone;ctx.fillStyle="hsl("+p.h+" "+p.s+"% "+Math.max(42,Math.min(91,light))+"%)";ctx.fill();ctx.strokeStyle="hsla("+p.h+" 40% 48% / .18)";ctx.lineWidth=.65;ctx.stroke()}
+ for(const t of tiles){if(t.broken)continue;trianglePath(t.p);const light=p.l+(-t.c.x*.025-t.c.y*.065)+t.tone;ctx.fillStyle="hsl("+p.h+" "+p.s+"% "+Math.max(42,Math.min(91,light))+"%)";ctx.fill();ctx.strokeStyle="hsla("+p.h+" 40% 48% / .18)";ctx.lineWidth=t.hits>0?2:.65;if(t.hits>0)ctx.strokeStyle="rgba(87,49,72,.6)";ctx.stroke()}
  ctx.beginPath();ctx.ellipse(-48,-78,36,15,-.7,0,Math.PI*2);ctx.fillStyle="rgba(255,255,255,.22)";ctx.fill();ctx.restore();
  pieces=pieces.filter(a=>a.life>0);
  for(const a of pieces){a.life-=dt;a.vy+=650*dt;a.x+=a.vx*dt;a.y+=a.vy*dt;a.angle+=a.spin*dt;if(a.y>190){a.y=190;a.vy=-Math.abs(a.vy)*.24;a.vx*=.9}
@@ -159,3 +161,29 @@ if(modelContext?.registerTool){
  register({name:"create_new_wax_ball",description:"진행 중인 왁뿌볼을 초기화하고 지정 색상의 새 공을 만듭니다.",inputSchema:{type:"object",properties:{color:{type:"integer",minimum:0,maximum:3}},required:["color"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:input=>newBall(input.color)});
  window.addEventListener("pagehide",()=>lifecycle.abort(),{once:true});
 }
+
+function renderCalculator(){
+ try{
+ const ids=["calc-speed","calc-power","calc-auto","calc-balance"],values=ids.map(id=>String($(id).value).trim());
+ if(values.some(value=>value===""))throw new Error("네 가지 조건을 모두 입력하세요.");
+ const result=globalThis.TokEconomy.compareUpgrades({clicksPerSecond:Number(values[0]),powerLevel:Number(values[1]),autoLevel:Number(values[2]),balance:Number(values[3])});
+ const seconds=n=>Number.isFinite(n)?(n===0?"지금 구매 가능":Math.ceil(n).toLocaleString("ko-KR")+"초"):"직접 클릭 필요";
+ $("calc-current-rate").textContent=result.rate.toLocaleString("ko-KR",{maximumFractionDigits:2})+" P / 초";
+ for(const type of ["power","auto"]){const r=result[type];$("calc-"+type+"-cost").textContent=fmt(r.cost)+" P";$("calc-"+type+"-wait").textContent=seconds(r.waitSeconds);$("calc-"+type+"-return").textContent=Number.isFinite(r.recoverySeconds)?Math.ceil(r.recoverySeconds).toLocaleString("ko-KR")+"초":"직접 클릭해야 회수 가능"}
+ $("calc-summary").textContent=result.power.recoverySeconds===result.auto.recoverySeconds?"두 강화의 추가 포인트 기준 회수 시간이 같습니다.":result.power.recoverySeconds<result.auto.recoverySeconds?"지금 조건에서는 손가락 강화가 더 빨리 비용을 회수합니다.":"지금 조건에서는 자동 톡톡이 더 빨리 비용을 회수합니다.";
+ $("calc-summary").dataset.error="false";
+ return result;
+ }catch(error){
+ for(const id of ["calc-current-rate","calc-power-cost","calc-power-wait","calc-power-return","calc-auto-cost","calc-auto-wait","calc-auto-return"])$(id).textContent="—";
+ $("calc-summary").textContent=error.message;$("calc-summary").dataset.error="true";return null;
+ }
+}
+$("economy-calculator").onsubmit=e=>{e.preventDefault();renderCalculator()};
+for(const id of ["calc-speed","calc-power","calc-auto","calc-balance"])$(id).oninput=renderCalculator;
+$("calc-use-current").onclick=()=>{$("calc-power").value=powerLevel;$("calc-auto").value=autoLevel;$("calc-balance").value=Math.floor(points);renderCalculator()};
+$("wax-hardness").onchange=()=>{
+ const next=Number($("wax-hardness").value);
+ if(![1,2,3].includes(next))return;
+ waxLayers=next;newBall();notify("새 두께로 왁뿌볼을 준비했어요.");
+};
+renderCalculator();
